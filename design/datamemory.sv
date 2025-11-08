@@ -7,7 +7,7 @@ module datamemory #(
     input logic clk,
     input logic MemRead,  // comes from control unit
     input logic MemWrite,  // Comes from control unit
-    input logic [DM_ADDRESS - 1:0] a,  // Read / Write address - 9 LSB bits of the ALU output
+    input logic [DM_ADDRESS - 1:0] a,  // Read / Write address - 9 LSB bits of the ALU output -> endereço do byte que vai ser lido (bloco de bytes)
     input logic [DATA_W - 1:0] wd,  // Write Data
     input logic [2:0] Funct3,  // bits 12 to 14 of the instruction
     output logic [DATA_W - 1:0] rd  // Read Data
@@ -28,27 +28,50 @@ module datamemory #(
       .Wr(Wr)
   );
 
-  always_ff @(*) begin
+  always_comb begin
     raddress = {{22{1'b0}}, a};
-    waddress = {{22{1'b0}}, {a[8:2], {2{1'b0}}}};
+    waddress = {{22{1'b0}}, a};
     Datain = wd;
     Wr = 4'b0000;
 
     if (MemRead) begin
       case (Funct3)
+        3'b000: begin //LB
+          case (a[1:0]) //determinar qual byte deve ser lido
+            2'b00: rd = {{24{Dataout[7]}}, Dataout[7:0]};    // byte 0
+            2'b01: rd = {{24{Dataout[15]}}, Dataout[15:8]};  // byte 1
+            2'b10: rd = {{24{Dataout[23]}}, Dataout[23:16]}; // byte 2
+            2'b11: rd = {{24{Dataout[31]}}, Dataout[31:24]}; // byte 3
+          endcase
+        end
+        3'b001: begin //LH
+          case (a[1:0]) //determinar o halfword a ser lido
+            2'b00: rd = {{16{Dataout[15]}}, Dataout[15:0]};    // halfword 0
+            2'b10: rd = {{16{Dataout[31]}}, Dataout[31:16]};  // halfword 1
+            default: rd = 32'b0; //quando o endereço estiver desalinhado
+          endcase
+        end
         3'b010:  //LW
-        rd <= Dataout;
-        default: rd <= Dataout;
+          rd = Dataout;
+        3'b100: begin //LBU
+          case (a[1:0])
+            2'b00: rd = {24'b0, Dataout[7:0]};    // byte 0
+            2'b01: rd = {24'b0, Dataout[15:8]};  // byte 1
+            2'b10: rd = {24'b0, Dataout[23:16]}; // byte 2
+            2'b11: rd = {24'b0, Dataout[31:24]}; // byte 3
+          endcase
+        end
+        default: rd = Dataout;
       endcase
     end else if (MemWrite) begin
       case (Funct3)
         3'b010: begin  //SW
-          Wr <= 4'b1111;
-          Datain <= wd;
+          Wr = 4'b1111;
+          Datain = wd;
         end
         default: begin
-          Wr <= 4'b1111;
-          Datain <= wd;
+          Wr = 4'b1111;
+          Datain = wd;
         end
       endcase
     end
