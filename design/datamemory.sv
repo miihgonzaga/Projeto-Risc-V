@@ -29,8 +29,8 @@ module datamemory #(
   );
 
   always_comb begin
-    raddress = {{22{1'b0}}, a};
-    waddress = {{22{1'b0}}, a};
+    raddress = {{22{1'b0}}, a[8:2], {2{1'b0}}};
+    waddress = {{22{1'b0}}, a[8:2], {2{1'b0}}}; 
     Datain = wd;
     Wr = 4'b0000;
 
@@ -65,6 +65,14 @@ module datamemory #(
       endcase
     end else if (MemWrite) begin
       case (Funct3)
+        3'b000: begin  //SB
+          case(a[1:0])
+            2'b00: Wr = 4'b0001; //escrever o byte 0
+            2'b01: Wr = 4'b0010; //escrever o byte 1
+            2'b10: Wr = 4'b0100; //escrever o byte 2
+            2'b11: Wr = 4'b1000; //escrever o byte 3
+          endcase
+        end
         3'b010: begin  //SW
           Wr = 4'b1111;
           Datain = wd;
