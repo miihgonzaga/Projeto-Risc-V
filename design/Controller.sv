@@ -22,10 +22,10 @@ module Controller (
   logic [6:0] R_TYPE, LW, SW, BR, IMM;
 
   assign R_TYPE = 7'b0110011;  //add,and
-  assign LW = 7'b0000011;  //lw
-  assign SW = 7'b0100011;  //sw
-  assign BR = 7'b1100011;  //beq
-  assign IMM = 7'b0010011;  //imm
+  assign LW = 7'b0000011;  //lw, lb, lh, lbu
+  assign SW = 7'b0100011;  //sw, sb, sh
+  assign BR = 7'b1100011;  //beq, bne, blt, bge
+  assign IMM = 7'b0010011;  //imm: addi, slti, slli, srli, srai
 
   assign ALUSrc = (Opcode == LW || Opcode == SW || Opcode == IMM);
   assign MemtoReg = (Opcode == LW);
