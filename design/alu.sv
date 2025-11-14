@@ -5,16 +5,23 @@ module alu #(
         parameter OPCODE_LENGTH = 4
         )
         (
-        input logic [DATA_WIDTH-1:0]    SrcA,
-        input logic [DATA_WIDTH-1:0]    SrcB,
+        // a alu sempre recebe dois valores (ScrA e ScrB) -> são os operandos 
+        // srcA vem dos registradores 
+        // srcB pode vir de registradores ou de immediatos (constantes da instrução)
+        // o ALUSrc (do módulo Controller) escolhe qual sinal será o operando B da ula:
+        //      escolhe entre registrador e immediato.
 
-        input logic [OPCODE_LENGTH-1:0]    Operation,
-        output logic[DATA_WIDTH-1:0] ALUResult
+        input logic [DATA_WIDTH-1:0]    SrcA, //entrada dos operandos da ULA (ambos com 32 bits)
+        input logic [DATA_WIDTH-1:0]    SrcB, // a ula recebe um valor gravado no reg ou um immediato
+
+        input logic [OPCODE_LENGTH-1:0]    Operation, //entrada que define a operação a ser realizada
+        output logic[DATA_WIDTH-1:0] ALUResult //saída = resultado da ula
         );
     
         always_comb
         begin
-            case(Operation)
+            case(Operation) //cada operação é um possível caso:
+
                 4'b0000:        // AND
                         ALUResult = SrcA & SrcB;
                 4'b0001:        // SUB
@@ -34,9 +41,11 @@ module alu #(
                 4'b1010:       //  SRLI
                         ALUResult = SrcA >> SrcB[4:0];
                 4'b1011:       //  SRAI
-                        ALUResult = $signed(SrcA) >>> SrcB[4:0]; 
-                default:
-                        ALUResult = 0;
+                        ALUResult = $signed(SrcA) >>> SrcB[4:0]; //levar em consideração o sinal
+
+                default: //se não for nenhum dos casos válidos descritos acima:
+                        ALUResult = 0; //resultado = 0
+
             endcase
         end
 endmodule
