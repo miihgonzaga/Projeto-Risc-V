@@ -25,13 +25,20 @@ module RegFile #(
   logic [DATA_WIDTH-1:0] register_file[NUM_REGS-1:0];
 
   always @(negedge clk) begin
-    if (rst == 1'b1) for (i = 0; i < NUM_REGS; i = i + 1) register_file[i] <= 0;
-    else if (rst == 1'b0 && rg_wrt_en == 1'b1) begin
-      register_file[rg_wrt_dest] <= rg_wrt_data;
+    if (rst == 1'b1) begin 
+      for (i = 0; i < NUM_REGS; i = i + 1) 
+        register_file[i] <= 0;
+    end
+    else begin
+      // impedir que x0 possa ser escrito!
+      if (rst == 1'b0 && rg_wrt_en == 1'b1 && rg_wrt_dest != 5'b0) begin
+        register_file[rg_wrt_dest] <= rg_wrt_data;
+      end
     end
   end
 
-  assign rg_rd_data1 = register_file[rg_rd_addr1];
-  assign rg_rd_data2 = register_file[rg_rd_addr2];
+  // garantir que não haverá escrita se o reg for x0:
+  assign rg_rd_data1 = (rg_rd_addr1 == 5'b0) ? 32'b0 : register_file[rg_rd_addr1];
+  assign rg_rd_data2 = (rg_rd_addr2 == 5'b0) ? 32'b0 : register_file[rg_rd_addr2];
 
 endmodule
