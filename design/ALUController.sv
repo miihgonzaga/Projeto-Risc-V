@@ -70,7 +70,12 @@ module ALUController (
                 endcase
             end
 
-            //2'b11: jal e jalr :)
+            2'b11: begin // jal e jalr
+                Operation = 4'b0010; // realiza a soma   
+            end
+
+            default:
+                Operation = 4'b0010;
                     
         endcase
     end
