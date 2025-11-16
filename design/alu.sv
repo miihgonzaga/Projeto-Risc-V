@@ -15,6 +15,8 @@ module alu #(
         input logic [DATA_WIDTH-1:0]    SrcB, // a ula recebe um valor gravado no reg ou um immediato
 
         input logic [OPCODE_LENGTH-1:0]    Operation, //entrada que define a operação a ser realizada
+
+        // overflows são desconsiderados por definição da arquitetura (32 bits é a saída da ula)
         output logic[DATA_WIDTH-1:0] ALUResult //saída = resultado da ula
         );
     
@@ -32,9 +34,9 @@ module alu #(
                         ALUResult = SrcA | SrcB;
                 4'b0100:        // XOR
                         ALUResult = SrcA ^ SrcB;
-                4'b0101: //SLT e SLTI
+                4'b0101: //SLT e SLTI (usado também pelo blt, bge)
                         ALUResult = ($signed(SrcA) < $signed(SrcB)) ? 1 : 0; //signed (considera valores negativos)
-                4'b1000:       //  Equal
+                4'b1000:       //  Equal (usado pelo beq e bne)
                         ALUResult = (SrcA == SrcB) ? 1 : 0;
                 4'b1001:       //  SLLI
                         ALUResult = SrcA << SrcB[4:0];
@@ -44,7 +46,7 @@ module alu #(
                         ALUResult = $signed(SrcA) >>> SrcB[4:0]; //levar em consideração o sinal
 
                 default: //se não for nenhum dos casos válidos descritos acima:
-                        ALUResult = 0; //resultado = 0
+                        ALUResult = 32'b0; //resultado = 0
 
             endcase
         end
