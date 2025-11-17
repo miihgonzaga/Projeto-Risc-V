@@ -67,10 +67,38 @@ module datamemory #(
       case (Funct3)
         3'b000: begin  //SB
           case(a[1:0])
-            2'b00: Wr = 4'b0001; //escrever o byte 0
-            2'b01: Wr = 4'b0010; //escrever o byte 1
-            2'b10: Wr = 4'b0100; //escrever o byte 2
-            2'b11: Wr = 4'b1000; //escrever o byte 3
+            2'b00: begin
+              Wr = 4'b0001; //escrever o byte 0
+              Datain = {24'b0, wd[7:0]};
+            end
+            2'b01: begin 
+              Wr = 4'b0010; //escrever o byte 1
+              Datain = {16'b0, wd[7:0], 8'b0};
+            end
+            2'b10: begin
+              Wr = 4'b0100; //escrever o byte 2
+              Datain = {8'b0, wd[7:0], 16'b0};
+            end
+            2'b11: begin
+              Wr = 4'b1000; //escrever o byte 3
+              Datain = {wd[7:0], 24'b0};
+            end 
+          endcase
+        end
+        3'b001: begin //SH
+          case(a[1:0])  //determina o endereço da operação
+          2'b00: begin 
+            Wr = 4'b0011; //escreve halfword 0; 
+            Datain = {16'b0, wd[15:0]};
+          end
+          2'b10: begin 
+            Wr = 4'b1100; //escreve halfword 1;
+            Datain = {wd[15:0], 16'b0};
+          end
+          default: begin
+            Wr = 4'b0000; //quando o endereço estiver desalinhado
+            Datain = 32'b0; 
+          end
           endcase
         end
         3'b010: begin  //SW
@@ -78,7 +106,7 @@ module datamemory #(
           Datain = wd;
         end
         default: begin
-          Wr = 4'b1111;
+          Wr = 4'b0000;  //mantém o "estado" anterior = nao escreve nada
           Datain = wd;
         end
       endcase
