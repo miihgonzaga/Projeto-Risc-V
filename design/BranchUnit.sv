@@ -115,7 +115,7 @@ module BranchUnit #(
     end
 
     // ativar PcSel se branchs ou jumps forem ativados:
-    assign PcSel = (Jump && Jump_Sel) || (Branch && Branch_Sel);  // o output de saída (PcSel é definido conforme Branch_Sel ou Jump_Sel)
+    assign PcSel = Jump || Branch;  // o output de saída (PcSel é definido conforme Branch_Sel ou Jump_Sel)
 
 
 endmodule
