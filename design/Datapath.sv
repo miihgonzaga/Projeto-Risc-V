@@ -18,6 +18,7 @@ module Datapath #(
     MemWrite,  // Register file or Immediate MUX // Memroy Writing Enable
     MemRead,  // Memroy Reading Enable
     Branch,  // Branch Enable
+    Jump, // Habilita jumps
     input  logic [          1:0] ALUOp,
     input  logic [ALU_CC_W -1:0] ALU_CC,         // ALU Control Code ( input of the ALU )
     output logic [          6:0] opcode,
@@ -45,6 +46,7 @@ module Datapath #(
   logic [DATA_W-1:0] SrcB, ALUResult;
   logic [DATA_W-1:0] ExtImm, BrImm, Old_PC_Four, BrPC;
   logic [DATA_W-1:0] WrmuxSrc;
+  logic [DATA_W-1:0] MemOrAlu; // sinal interno intermediário (writeback de jumps)
   logic PcSel;  // mux select / flush signal
   logic [1:0] FAmuxSel;
   logic [1:0] FBmuxSel;
@@ -132,44 +134,48 @@ module Datapath #(
 
   // ID_EX_Reg B;
   always @(posedge clk) begin
-    if ((reset) || (Reg_Stall) || (PcSel))   // initialization or flush or generate a NOP if hazard
-        begin
-      B.ALUSrc <= 0;
-      B.MemtoReg <= 0;
-      B.RegWrite <= 0;
-      B.MemRead <= 0;
-      B.MemWrite <= 0;
-      B.ALUOp <= 0;
-      B.Branch <= 0;
-      B.Curr_Pc <= 0;
-      B.RD_One <= 0;
-      B.RD_Two <= 0;
-      B.RS_One <= 0;
-      B.RS_Two <= 0;
-      B.rd <= 0;
-      B.ImmG <= 0;
-      B.func3 <= 0;
-      B.func7 <= 0;
-      B.Curr_Instr <= A.Curr_Instr;  //debug tmp
-    end else begin
-      B.ALUSrc <= ALUsrc;
-      B.MemtoReg <= MemtoReg;
-      B.RegWrite <= RegWrite;
-      B.MemRead <= MemRead;
-      B.MemWrite <= MemWrite;
-      B.ALUOp <= ALUOp;
-      B.Branch <= Branch;
-      B.Curr_Pc <= A.Curr_Pc;
-      B.RD_One <= Reg1;
-      B.RD_Two <= Reg2;
-      B.RS_One <= A.Curr_Instr[19:15];
-      B.RS_Two <= A.Curr_Instr[24:20];
-      B.rd <= A.Curr_Instr[11:7];
-      B.ImmG <= ExtImm;
-      B.func3 <= A.Curr_Instr[14:12];
-      B.func7 <= A.Curr_Instr[31:25];
-      B.Curr_Instr <= A.Curr_Instr;  //debug tmp
-    end
+    if ((reset) || (Reg_Stall) || (PcSel))   // caso seja um reset, o registrador vira um NOP (força a ser zero)
+      begin
+        B.ALUSrc <= 0; //zerar sinais
+        B.MemtoReg <= 0;
+        B.RegWrite <= 0;
+        B.MemRead <= 0;
+        B.MemWrite <= 0;
+        B.ALUOp <= 0;
+        B.Branch <= 0;
+        B.Jump <= 0;
+        B.Curr_Pc <= 0;
+        B.RD_One <= 0;
+        B.RD_Two <= 0;
+        B.RS_One <= 0;
+        B.RS_Two <= 0;
+        B.rd <= 0;
+        B.ImmG <= 0;
+        B.func3 <= 0;
+        B.func7 <= 0;
+        B.Curr_Instr <= A.Curr_Instr;  //debug tmp
+    end 
+    else //caso contrário (manter sinais como estão)
+      begin
+        B.ALUSrc <= ALUsrc;
+        B.MemtoReg <= MemtoReg;
+        B.RegWrite <= RegWrite;
+        B.MemRead <= MemRead;
+        B.MemWrite <= MemWrite;
+        B.ALUOp <= ALUOp;
+        B.Branch <= Branch;
+        B.Jump <= Jump;
+        B.Curr_Pc <= A.Curr_Pc;
+        B.RD_One <= Reg1;
+        B.RD_Two <= Reg2;
+        B.RS_One <= A.Curr_Instr[19:15];
+        B.RS_Two <= A.Curr_Instr[24:20];
+        B.rd <= A.Curr_Instr[11:7];
+        B.ImmG <= ExtImm;
+        B.func3 <= A.Curr_Instr[14:12];
+        B.func7 <= A.Curr_Instr[31:25];
+        B.Curr_Instr <= A.Curr_Instr;  //debug tmp
+      end
   end
 
   //--// The Forwarding Unit
@@ -217,10 +223,13 @@ module Datapath #(
       ALU_CC,
       ALUResult
   );
-  BranchUnit #(9) brunit (
+  BranchUnit #(9) brunit ( 
       B.Curr_Pc,
       B.ImmG,
       B.Branch,
+      B.Jump, // implementar jal e jalr
+      B.func3, // distinguir entre os branches tomados
+      B.Curr_Instr[6:0], // opcode = distinguir entre jumps tomados 
       ALUResult,
       BrImm,
       Old_PC_Four,
@@ -230,34 +239,38 @@ module Datapath #(
 
   // EX_MEM_Reg C;
   always @(posedge clk) begin
-    if (reset)   // initialization
-        begin
-      C.RegWrite <= 0;
-      C.MemtoReg <= 0;
-      C.MemRead <= 0;
-      C.MemWrite <= 0;
-      C.Pc_Imm <= 0;
-      C.Pc_Four <= 0;
-      C.Imm_Out <= 0;
-      C.Alu_Result <= 0;
-      C.RD_Two <= 0;
-      C.rd <= 0;
-      C.func3 <= 0;
-      C.func7 <= 0;
-    end else begin
-      C.RegWrite <= B.RegWrite;
-      C.MemtoReg <= B.MemtoReg;
-      C.MemRead <= B.MemRead;
-      C.MemWrite <= B.MemWrite;
-      C.Pc_Imm <= BrImm;
-      C.Pc_Four <= Old_PC_Four;
-      C.Imm_Out <= B.ImmG;
-      C.Alu_Result <= ALUResult;
-      C.RD_Two <= FBmux_Result;
-      C.rd <= B.rd;
-      C.func3 <= B.func3;
-      C.func7 <= B.func7;
-      C.Curr_Instr <= B.Curr_Instr;  // debug tmp
+    if (reset)   // resetar sinais (zera tudo)
+      begin
+        C.RegWrite <= 0;
+        C.MemtoReg <= 0;
+        C.MemRead <= 0;
+        C.MemWrite <= 0;
+        C.Jump <= 0; 
+        C.Pc_Imm <= 0;
+        C.Pc_Four <= 0;
+        C.Imm_Out <= 0;
+        C.Alu_Result <= 0;
+        C.RD_Two <= 0;
+        C.rd <= 0;
+        C.func3 <= 0;
+        C.func7 <= 0;
+    end 
+    else // caso nao esteja resetando 
+      begin //passa os sinais do estágio anterior adiante
+        C.RegWrite <= B.RegWrite;
+        C.MemtoReg <= B.MemtoReg;
+        C.MemRead <= B.MemRead;
+        C.MemWrite <= B.MemWrite;
+        C.Jump <= B.Jump; // passa o sinal do estágio anterior pro próximo!! 
+        C.Pc_Imm <= BrImm;
+        C.Pc_Four <= Old_PC_Four;
+        C.Imm_Out <= B.ImmG;
+        C.Alu_Result <= ALUResult;
+        C.RD_Two <= FBmux_Result;
+        C.rd <= B.rd;
+        C.func3 <= B.func3;
+        C.func7 <= B.func7;
+        C.Curr_Instr <= B.Curr_Instr;  // debug tmp
     end
   end
 
@@ -280,37 +293,54 @@ module Datapath #(
 
   // MEM_WB_Reg D;
   always @(posedge clk) begin
-    if (reset)   // initialization
-        begin
-      D.RegWrite <= 0;
-      D.MemtoReg <= 0;
-      D.Pc_Imm <= 0;
-      D.Pc_Four <= 0;
-      D.Imm_Out <= 0;
-      D.Alu_Result <= 0;
-      D.MemReadData <= 0;
-      D.rd <= 0;
-    end else begin
-      D.RegWrite <= C.RegWrite;
-      D.MemtoReg <= C.MemtoReg;
-      D.Pc_Imm <= C.Pc_Imm;
-      D.Pc_Four <= C.Pc_Four;
-      D.Imm_Out <= C.Imm_Out;
-      D.Alu_Result <= C.Alu_Result;
-      D.MemReadData <= ReadData;
-      D.rd <= C.rd;
-      D.Curr_Instr <= C.Curr_Instr;  //Debug Tmp
+    if (reset)   // bloco de reset
+      begin
+        D.RegWrite <= 0;
+        D.MemtoReg <= 0;
+        D.Jump <= 0; 
+        D.Pc_Imm <= 0;
+        D.Pc_Four <= 0;
+        D.Imm_Out <= 0;
+        D.Alu_Result <= 0;
+        D.MemReadData <= 0;
+        D.rd <= 0;
+    end 
+    else 
+      begin
+        D.RegWrite <= C.RegWrite;
+        D.MemtoReg <= C.MemtoReg;
+        D.Jump <= C.Jump; // passar sinal adiante
+        D.Pc_Imm <= C.Pc_Imm;
+        D.Pc_Four <= C.Pc_Four;
+        D.Imm_Out <= C.Imm_Out;
+        D.Alu_Result <= C.Alu_Result;
+        D.MemReadData <= ReadData;
+        D.rd <= C.rd;
+        D.Curr_Instr <= C.Curr_Instr;  //Debug Tmp
     end
   end
 
   //--// The LAST Block
+  // Dois mux para determinar a saída final (wb)
+    // mux 1 decide entre aluresult e dado da memória
+    // mux 2 escolhe entre o sinal do primeiro mux e pc+4 (caso seja um jump)
+
+  // primeiro mux (entre alu e memória)
   mux2 #(32) resmux (
       D.Alu_Result,
       D.MemReadData,
       D.MemtoReg,
-      WrmuxSrc
+      MemOrAlu   // guarda o resultado do mux
   );
 
-  assign WB_Data = WrmuxSrc;
+  // segundo mux (entre alu, memoria e jumps)
+  mux2 #(32) jumpWB_mux (
+      MemOrAlu,  // saída do primeiro mux 
+      D.Pc_Four, 
+      D.Jump, 
+      WrmuxSrc // produz a saída com a "decisão final" entre os muxs
+  );
+
+  assign WB_Data = WrmuxSrc; // passa sinal com "decisão finals"
 
 endmodule
