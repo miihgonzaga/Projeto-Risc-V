@@ -8,9 +8,11 @@ module BranchUnit #(
     input logic [31:0] Imm, // entrada de immediato com 32 bits (sign-extended)
     input logic Branch, // entrada que indica se o branch foi tomado ou não
     input logic Jump,  // implementar jal e jalr (indica se jump foi tomado)
+    input logic [31:0] Curr_Instr,
     input logic [31:0] AluResult, // resultado da ula (32 bits)
-    input logic [2:0] Funct3,  // pra identificar o tipo de branch 
-    input logic [6:0] Opcode, // decidir entre jal e jalr
+    
+    //input logic [2:0] Funct3,  // pra identificar o tipo de branch 
+    //input logic [6:0] Opcode, // decidir entre jal e jalr
 
     // saídas:
     output logic [31:0] PC_Imm, // pc + imm (offset do branch/jump) (vem do imm_Gen)
@@ -27,11 +29,15 @@ module BranchUnit #(
     logic Jump_Sel; // 0 = nenhum jump foi tomado; 1 = (jal ou jalr) foi tomado
     logic [31:0] Jump_Address; // endereço de destino do jump
     logic [31:0] PC_Full; // cria a instância de um campo com 32 bits (completa o PC)
+    logic [2:0] Funct3;
+    logic [6:0] Opcode;
     
     
     assign PC_Full = {23'b0, Cur_PC}; //completa os 32 bits do Cur_PC (inicialmente chega com 9 bits)
     assign PC_Imm = PC_Full + Imm; // o PC_Imm é o valor do pc caso o branch seja tomado
     assign PC_Four = PC_Full + 32'b100; // pc + 4 
+    assign Funct3 = Curr_Instr[14:12];
+    assign Opcode = Curr_Instr[6:0];
 
 
     // determinar se o branch foi tomado, conforme os resultados da alu
@@ -48,13 +54,13 @@ module BranchUnit #(
                 // o bit menos significativo do AluResult indica o resultado do equal e slt (0 ou 1)
 
                 3'b000: // beq
-                    Branch_Sel = (AluResult[0] == 1'b1); // assume o valor do Equal
+                    Branch_Sel = AluResult[0]; // assume o valor do Equal
                 3'b001: // bne
-                    Branch_Sel = (AluResult[0] == 1'b0); // assume o valor negado do Equal
+                    Branch_Sel = ~AluResult[0]; // assume o valor negado do Equal
                 3'b100: // blt
-                    Branch_Sel = (AluResult[0] == 1'b1); // assume o valor do SLT
+                    Branch_Sel = AluResult[0]; // assume o valor do SLT
                 3'b101: // bge  
-                    Branch_Sel = (AluResult[0] == 1'b0); // assume o valor contrário ao SLT
+                    Branch_Sel = ~AluResult[0]; // assume o valor contrário ao SLT
 
                 default: // caso não seja nenhum dos funct3s acima
                     Branch_Sel = 1'b0; // branch não é tomado!!
@@ -115,7 +121,7 @@ module BranchUnit #(
     end
 
     // ativar PcSel se branchs ou jumps forem ativados:
-    assign PcSel = Jump || Branch;  // o output de saída (PcSel é definido conforme Branch_Sel ou Jump_Sel)
+    assign PcSel = Jump_Sel || Branch_Sel;  // o output de saída (PcSel é definido conforme Branch_Sel ou Jump_Sel)
 
 
 endmodule
