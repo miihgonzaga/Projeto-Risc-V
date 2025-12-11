@@ -53,6 +53,7 @@ module Datapath #(
   logic [DATA_W-1:0] FAmux_Result;
   logic [DATA_W-1:0] FBmux_Result;
   logic Reg_Stall;  //1: PC fetch same, Register not update
+  logic Pc_Sel_delay; //registrador que deve atrasar pc_Sel em 1 ciclo
 
   if_id_reg A;
   id_ex_reg B;
@@ -153,7 +154,7 @@ module Datapath #(
         B.ImmG <= 0;
         B.func3 <= 0;
         B.func7 <= 0;
-        B.Curr_Instr <= A.Curr_Instr;  //debug tmp
+        B.Curr_Instr <= 0;  //debug tmp
     end 
     else //caso contrário (manter sinais como estão)
       begin
@@ -228,8 +229,8 @@ module Datapath #(
       B.ImmG,
       B.Branch,
       B.Jump, // implementar jal e jalr
-      B.func3, // distinguir entre os branches tomados
-      B.Curr_Instr[6:0], // opcode = distinguir entre jumps tomados 
+      //B.func3, // distinguir entre os branches tomados
+      B.Curr_Instr, // opcode = distinguir entre jumps tomados 
       ALUResult,
       BrImm,
       Old_PC_Four,
@@ -237,9 +238,16 @@ module Datapath #(
       PcSel
   );
 
+  always @(posedge clk) begin //atrasar em 1 ciclo para flush do EX/MEM
+    if (reset)
+      Pc_Sel_delay <= 0;
+    else
+      Pc_Sel_delay <= PcSel;
+  end
+
   // EX_MEM_Reg C;
   always @(posedge clk) begin
-    if (reset)   // resetar sinais (zera tudo)
+    if (reset || Pc_Sel_delay)   // resetar sinais (zera tudo) (PC_Sel_delay cancela a instrução no EX/MEM)
       begin
         C.RegWrite <= 0;
         C.MemtoReg <= 0;
